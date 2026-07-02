@@ -1,43 +1,46 @@
 # Claude Science ← Codex Connector
 
-用 **ChatGPT Pro / Plus 订阅自带的 Codex 额度** 直接驱动 Claude Science 的本地代理工具。你不需要购买 OpenAI API key，只要有 ChatGPT Pro 或 Plus 订阅，通过 Codex device code 登录即可把 Codex 额度桥接给 Claude Science 使用。
+English | [简体中文](README_zh.md)
 
-> **本项目基于 [Jyx0208/claude-science-api-bridge](https://github.com/Jyx0208/claude-science-api-bridge)（MIT 协议）修改。**
-> 原项目让 Claude Science 使用 DeepSeek / OpenAI / 自定义 API key。本项目在此基础上修改为：**用 ChatGPT Pro / Plus 附带的 Codex 额度即可使用 Claude Science**，无需额外的 OpenAI API key。
+A local proxy that lets you drive **Claude Science** with the **Codex quota included in your ChatGPT Pro / Plus subscription**. You don't need to buy an OpenAI API key — if you have a ChatGPT Pro or Plus plan, just sign in with a Codex device code and your Codex quota is bridged to Claude Science.
 
-## 原理
+> **This project is a modified version of [Jyx0208/claude-science-api-bridge](https://github.com/Jyx0208/claude-science-api-bridge) (MIT license).**
+> The original project lets Claude Science use DeepSeek / OpenAI / custom API keys. This project modifies it so that **the Codex quota bundled with a ChatGPT Pro / Plus subscription is enough to use Claude Science**, with no separate OpenAI API key required.
 
-ChatGPT Pro/Plus 的登录 token **不能**直接调用 `api.openai.com`。本工具在本机启动一个 Anthropic 兼容代理（`http://127.0.0.1:9876`），把 Claude Science 发出的 Anthropic Messages 请求翻译成 OpenAI Responses 协议，转发到 ChatGPT 官方的 Codex 后端（`https://chatgpt.com/backend-api/codex/responses`），并带上 `chatgpt-account-id` 头。这样 Claude Science 只看到标准 Anthropic 接口，而实际算力来自你的 ChatGPT 订阅额度（含流式与工具调用）。
+## How it works
 
-## 使用要求
+A ChatGPT Pro/Plus login token **cannot** call `api.openai.com` directly. This tool runs a local Anthropic-compatible proxy (`http://127.0.0.1:9876`) that translates the Anthropic Messages requests sent by Claude Science into the OpenAI Responses protocol, forwards them to ChatGPT's official Codex backend (`https://chatgpt.com/backend-api/codex/responses`), and attaches the `chatgpt-account-id` header. Claude Science only ever sees a standard Anthropic interface, while the actual compute is billed against your ChatGPT subscription quota (streaming and tool calls included).
 
-- 一台 macOS 电脑
-- 已安装 Claude Science
-- 一个 ChatGPT Pro 或 Plus 订阅
+## Requirements
+
+- A macOS computer
+- Claude Science installed
+- A ChatGPT Pro or Plus subscription
 - Python 3.9+
 
-## 快速开始
+## Quick start
 
 ```bash
-# 1. 安装依赖
+# 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. 用 Codex device code 登录（浏览器打开 https://auth.openai.com/codex/device 输入 code）
+# 2. Sign in with a Codex device code
+#    (opens https://auth.openai.com/codex/device where you enter the code)
 ./setup-codex-device.py
 
-# 3. 让 Claude Science 走本地代理
+# 3. Point Claude Science at the local proxy
 export ANTHROPIC_BASE_URL=http://127.0.0.1:9876
 
-# 4. 启动代理
+# 4. Start the proxy
 ./start.sh
 ```
 
-`setup-codex-device.py` 会：
+`setup-codex-device.py` will:
 
-- 如果本机已用 `codex login` 登录过 Codex CLI（存在 `~/.codex/auth.json`），直接导入，无需再输入 code；
-- 否则打印登录地址 `https://auth.openai.com/codex/device` 和一次性 code，你在浏览器登录并输入 code 即可。
+- Import your existing Codex CLI login automatically if you've already run `codex login` (i.e. `~/.codex/auth.json` exists), so no code entry is needed; otherwise
+- Print the login URL `https://auth.openai.com/codex/device` and a one-time code for you to sign in with in the browser.
 
-登录成功后，token 保存在本机 `codex-auth.json`（权限 `0600`），并自动把后端切换为 ChatGPT Codex：
+After a successful login, the token is stored locally in `codex-auth.json` (mode `0600`) and the backend is automatically switched to ChatGPT Codex:
 
 ```json
 {
@@ -48,21 +51,21 @@ export ANTHROPIC_BASE_URL=http://127.0.0.1:9876
 }
 ```
 
-## 让 Claude Science 使用代理
+## Point Claude Science at the proxy
 
-代理启动后，确保 Claude Science 使用本地代理地址：
+Once the proxy is running, make sure Claude Science uses the local proxy address:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://127.0.0.1:9876
 ```
 
-然后（重新）启动 Claude Science。也可以打开管理面板确认状态：
+Then (re)start Claude Science. You can also open the management dashboard to check status:
 
 ```
 http://127.0.0.1:9876/dashboard
 ```
 
-## 验证
+## Verify
 
 ```bash
 curl -sS http://127.0.0.1:9876/health
@@ -71,43 +74,44 @@ curl -sS http://127.0.0.1:9876/v1/messages \
   -d '{"model":"claude-sonnet-4-5","max_tokens":32,"messages":[{"role":"user","content":"Reply OK"}]}'
 ```
 
-`/health` 返回 `"status":"ok"`，`/v1/messages` 返回 Anthropic 格式的消息即成功。
+Success means `/health` returns `"status":"ok"` and `/v1/messages` returns an Anthropic-formatted message.
 
-## 配置说明
+## Configuration
 
-默认配置见 `config.example.json`，首次运行 `start.sh` 会自动复制成本机 `config.json`。常用项：
+Default settings live in `config.example.json`. The first run of `start.sh` copies it to a local `config.json`. Common options:
 
-| 字段 | 说明 | 默认 |
+| Field | Description | Default |
 | --- | --- | --- |
-| `openai_auth_mode` | `codex_device` 时使用 ChatGPT 订阅额度 | `api_key` |
-| `codex_backend_url` | ChatGPT Codex 后端地址 | `https://chatgpt.com/backend-api/codex` |
-| `codex_model` | 使用的模型 | `gpt-5-codex` |
-| `proxy_port` | 本地代理端口 | `9876` |
+| `openai_auth_mode` | `codex_device` uses your ChatGPT subscription quota | `api_key` |
+| `codex_backend_url` | ChatGPT Codex backend URL | `https://chatgpt.com/backend-api/codex` |
+| `codex_model` | Model to use | `gpt-5-codex` |
+| `proxy_port` | Local proxy port | `9876` |
 
-> 如果 OpenAI 调整了 Codex 后端地址或模型名，可在 `config.json` 中覆盖 `codex_backend_url` / `codex_model`。
+> If OpenAI changes the Codex backend URL or model name, override `codex_backend_url` / `codex_model` in `config.json`.
 
-## 项目结构
+## Project structure
 
 ```text
 .
-├── README.md
+├── README.md              # English documentation
+├── README_zh.md           # Chinese documentation
 ├── LICENSE
 ├── requirements.txt
 ├── config.example.json
-├── proxy.py               # 本地 Anthropic <-> Codex Responses 代理
-├── setup-codex-device.py  # Codex device code 登录
-├── setup-token.py         # 生成 Claude Science 可接受的本地 OAuth token
-├── start.sh               # 启动代理
+├── proxy.py               # Local Anthropic <-> Codex Responses proxy
+├── setup-codex-device.py  # Codex device-code login
+├── setup-token.py         # Generates a local OAuth token Claude Science accepts
+├── start.sh               # Starts the proxy
 └── static/
-    └── dashboard.html     # 管理面板
+    └── dashboard.html     # Management dashboard
 ```
 
-## 安全说明
+## Security notes
 
-- `config.json` 和 `codex-auth.json` 已在 `.gitignore` 中排除，**不会**被提交。
-- 你的 ChatGPT 登录 token 只保存在本机 `codex-auth.json`（权限 `0600`）。
-- 请勿把 `codex-auth.json` 或 `config.json` 上传到任何仓库。
+- `config.json` and `codex-auth.json` are excluded via `.gitignore` and will **not** be committed.
+- Your ChatGPT login token is stored only on your machine in `codex-auth.json` (mode `0600`).
+- Never upload `codex-auth.json` or `config.json` to any repository.
 
-## 许可证
+## License
 
-MIT。见 `LICENSE`。本项目是 [Jyx0208/claude-science-api-bridge](https://github.com/Jyx0208/claude-science-api-bridge)（MIT 协议）的修改版，原项目与本项目均遵循 MIT 协议。
+MIT. See `LICENSE`. This project is a modified version of [Jyx0208/claude-science-api-bridge](https://github.com/Jyx0208/claude-science-api-bridge) (MIT license); both the original and this project are released under the MIT license.
