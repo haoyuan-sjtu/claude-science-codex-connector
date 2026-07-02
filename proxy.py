@@ -68,7 +68,7 @@ class Config:
         "codex_device_url": "https://auth.openai.com/codex/device",
         "codex_client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
         "codex_backend_url": "https://chatgpt.com/backend-api/codex",
-        "codex_model": "gpt-5-codex",
+        "codex_model": "gpt-5.5",
         "codex_model_map": {},
         "default_backend": "deepseek",
         "force_model": "",
@@ -247,7 +247,7 @@ class Config:
                     self.force_model
                     or self.codex_model_map.get(model)
                     or self.codex_model
-                    or "gpt-5-codex"
+                    or "gpt-5.5"
                 )
                 auth_header = codex_auth_store.authorization_header()
                 return {
@@ -1195,13 +1195,9 @@ def anthropic_to_codex_responses(anthropic_body: dict, backend_model: str) -> di
     if instructions:
         responses_body["instructions"] = instructions
 
-    if "temperature" in anthropic_body:
-        responses_body["temperature"] = anthropic_body["temperature"]
-    if "top_p" in anthropic_body:
-        responses_body["top_p"] = anthropic_body["top_p"]
-    max_tokens = anthropic_body.get("max_tokens")
-    if max_tokens:
-        responses_body["max_output_tokens"] = max_tokens
+    # NOTE: The ChatGPT-account Codex backend rejects sampling/limit params
+    # (temperature, top_p, max_output_tokens) with HTTP 400 "Unsupported
+    # parameter". They are intentionally omitted here.
 
     tools = anthropic_body.get("tools")
     if tools:
@@ -1889,11 +1885,10 @@ async def api_test_backend(request: Request):
             "account_id": codex_auth_store.account_id(),
         }
         probe_body = {
-            "model": config.codex_model or "gpt-5-codex",
+            "model": config.codex_model or "gpt-5.5",
             "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "ping"}]}],
             "stream": True,
             "store": False,
-            "max_output_tokens": 16,
         }
         url = f"{config.codex_backend_url.rstrip('/')}/responses"
         try:
@@ -1901,7 +1896,7 @@ async def api_test_backend(request: Request):
                 async with c.stream("POST", url, json=probe_body, headers=_codex_headers(backend)) as resp:
                     if resp.status_code == 200:
                         await resp.aclose()
-                        return {"ok": True, "models": [config.codex_model or "gpt-5-codex"]}
+                        return {"ok": True, "models": [config.codex_model or "gpt-5.5"]}
                     err_text = (await resp.aread()).decode("utf-8", errors="replace")[:300]
                     return {"ok": False, "error": f"HTTP {resp.status_code}: {err_text}"}
         except Exception as e:

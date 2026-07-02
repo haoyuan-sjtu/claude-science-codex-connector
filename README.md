@@ -95,7 +95,7 @@ Default settings live in `config.example.json`. The first run of `start.sh` copi
 | --- | --- | --- |
 | `openai_auth_mode` | `codex_device` uses your ChatGPT subscription quota | `api_key` |
 | `codex_backend_url` | ChatGPT Codex backend URL | `https://chatgpt.com/backend-api/codex` |
-| `codex_model` | Default model when no per-model mapping matches | `gpt-5-codex` |
+| `codex_model` | Default model when no per-model mapping matches | `gpt-5.5` |
 | `codex_model_map` | Maps each Claude model to a Codex model (see below) | `{}` |
 | `proxy_port` | Local proxy port | `9876` |
 
@@ -110,16 +110,22 @@ Claude Science requests different Claude models (Opus / Sonnet / Haiku). You can
   "openai_auth_mode": "codex_device",
   "default_backend": "openai",
   "force_model": "",
-  "codex_model": "gpt-5.5-codex",
+  "codex_model": "gpt-5.5",
   "codex_model_map": {
-    "claude-opus-4-8": "gpt-5.5-codex",
-    "claude-sonnet-4-5": "gpt-5.5-codex",
-    "claude-haiku-4-5": "gpt-5.4-codex"
+    "claude-opus-4-8": "gpt-5.5",
+    "claude-sonnet-4-5": "gpt-5.5",
+    "claude-haiku-4-5": "gpt-5.4"
   }
 }
 ```
 
 Any model not in the map falls back to `codex_model`.
+
+> **Note on model IDs:** with a ChatGPT account, the Codex backend only accepts
+> its supported model IDs (e.g. `gpt-5.5`, `gpt-5.4`). Suffixed variants like
+> `gpt-5.5-codex` or `gpt-5`/`gpt-5-codex` are rejected with a 400 error.
+> The backend also rejects the `temperature`, `top_p`, and `max_output_tokens`
+> parameters, so the proxy omits them automatically for the Codex path.
 
 ## Project structure
 

@@ -84,7 +84,7 @@ curl -sS http://127.0.0.1:9876/v1/messages \
 | --- | --- | --- |
 | `openai_auth_mode` | `codex_device` 时使用 ChatGPT 订阅额度 | `api_key` |
 | `codex_backend_url` | ChatGPT Codex 后端地址 | `https://chatgpt.com/backend-api/codex` |
-| `codex_model` | 无匹配映射时的默认模型 | `gpt-5-codex` |
+| `codex_model` | 无匹配映射时的默认模型 | `gpt-5.5` |
 | `codex_model_map` | 把每个 Claude 模型映射到对应 Codex 模型（见下） | `{}` |
 | `proxy_port` | 本地代理端口 | `9876` |
 
@@ -99,16 +99,21 @@ Claude Science 会请求不同的 Claude 模型（Opus / Sonnet / Haiku）。你
   "openai_auth_mode": "codex_device",
   "default_backend": "openai",
   "force_model": "",
-  "codex_model": "gpt-5.5-codex",
+  "codex_model": "gpt-5.5",
   "codex_model_map": {
-    "claude-opus-4-8": "gpt-5.5-codex",
-    "claude-sonnet-4-5": "gpt-5.5-codex",
-    "claude-haiku-4-5": "gpt-5.4-codex"
+    "claude-opus-4-8": "gpt-5.5",
+    "claude-sonnet-4-5": "gpt-5.5",
+    "claude-haiku-4-5": "gpt-5.4"
   }
 }
 ```
 
 映射中未列出的模型会回退到 `codex_model`。
+
+> **模型 ID 说明：** 使用 ChatGPT 账号时，Codex 后端只接受其支持的模型 ID（例如
+> `gpt-5.5`、`gpt-5.4`）。带后缀的 `gpt-5.5-codex`，或 `gpt-5`/`gpt-5-codex`
+> 等都会返回 400 错误。后端同时拒绝 `temperature`、`top_p`、`max_output_tokens`
+> 参数，因此代理在 Codex 路径下会自动省略这些参数。
 
 ## 项目结构
 

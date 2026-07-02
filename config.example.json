@@ -10,11 +10,11 @@
   "codex_device_url": "https://auth.openai.com/codex/device",
   "codex_client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
   "codex_backend_url": "https://chatgpt.com/backend-api/codex",
-  "codex_model": "gpt-5-codex",
+  "codex_model": "gpt-5.5",
   "codex_model_map": {
-    "claude-opus-4-8": "gpt-5.5-codex",
-    "claude-sonnet-4-5": "gpt-5.5-codex",
-    "claude-haiku-4-5": "gpt-5.4-codex"
+    "claude-opus-4-8": "gpt-5.5",
+    "claude-sonnet-4-5": "gpt-5.5",
+    "claude-haiku-4-5": "gpt-5.4"
   },
   "default_backend": "deepseek",
   "force_model": "deepseek-chat",
