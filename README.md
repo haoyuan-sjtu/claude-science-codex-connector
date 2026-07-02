@@ -33,7 +33,7 @@ pip install -r requirements.txt
 export ANTHROPIC_BASE_URL=http://127.0.0.1:9876
 
 # 4. Start the proxy
-./start.sh
+bash ./start.sh
 ```
 
 `setup-codex-device.py` will:
