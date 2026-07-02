@@ -1,0 +1,14 @@
+# Local secrets and runtime state - NEVER commit
+config.json
+codex-auth.json
+*.plist
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# macOS
+.DS_Store
