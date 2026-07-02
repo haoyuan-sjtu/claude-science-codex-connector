@@ -1,11 +1,12 @@
-# Claude Science ← Codex Connector
+# Claude Science_Codex Connector
 
 English | [简体中文](README_zh.md)
 
-A local proxy that lets you drive **Claude Science** with the **Codex quota included in your ChatGPT Pro / Plus subscription**. You don't need to buy an OpenAI API key — if you have a ChatGPT Pro or Plus plan, just sign in with a Codex device code and your Codex quota is bridged to Claude Science.
+A local proxy that lets you drive **Claude Science** with the **Codex quota included in your ChatGPT Pro / Plus subscription**. You don't need to buy a separate OpenAI API key — if you have a ChatGPT Pro or Plus plan, just sign in with a Codex device code and your Codex quota is bridged to Claude Science.
 
 > **This project is a modified version of [Jyx0208/claude-science-api-bridge](https://github.com/Jyx0208/claude-science-api-bridge) (MIT license).**
-> The original project lets Claude Science use DeepSeek / OpenAI / custom API keys. This project modifies it so that **the Codex quota bundled with a ChatGPT Pro / Plus subscription is enough to use Claude Science**, with no separate OpenAI API key required.
+> The original project lets Claude Science use DeepSeek / OpenAI / custom API keys.
+> This project modifies it so that **the Codex quota bundled with a ChatGPT Pro / Plus subscription is enough to use Claude Science**, with no separate OpenAI API key required.
 
 ## How it works
 
@@ -13,7 +14,7 @@ A ChatGPT Pro/Plus login token **cannot** call `api.openai.com` directly. This t
 
 ## Requirements
 
-- A macOS computer
+- Tested on macOS (Windows/Linux not yet confirmed)
 - Claude Science installed
 - A ChatGPT Pro or Plus subscription
 - Python 3.9+
@@ -108,9 +109,9 @@ Default settings live in `config.example.json`. The first run of `start.sh` copi
 
 ## Security notes
 
-- `config.json` and `codex-auth.json` are excluded via `.gitignore` and will **not** be committed.
+- `config.json` and `codex-auth.json` are excluded via `.gitignore` and are not part of the repository files.
 - Your ChatGPT login token is stored only on your machine in `codex-auth.json` (mode `0600`).
-- Never upload `codex-auth.json` or `config.json` to any repository.
+- Never upload `codex-auth.json` or `config.json` to the internet.
 
 ## License
 
