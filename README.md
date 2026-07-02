@@ -22,12 +22,16 @@ A ChatGPT Pro/Plus login token **cannot** call `api.openai.com` directly. This t
 ## Quick start
 
 ```bash
+# 0. Clone the repo and enter the directory
+git clone https://github.com/haoyuan-sjtu/claude-science-codex-connector.git
+cd claude-science-codex-connector
+
 # 1. Install dependencies
 pip install -r requirements.txt
 
 # 2. Sign in with a Codex device code
 #    (opens https://auth.openai.com/codex/device where you enter the code)
-./setup-codex-device.py
+python3 setup-codex-device.py
 
 # 3. Point Claude Science at the local proxy
 export ANTHROPIC_BASE_URL=http://127.0.0.1:9876
@@ -35,6 +39,12 @@ export ANTHROPIC_BASE_URL=http://127.0.0.1:9876
 # 4. Start the proxy
 bash ./start.sh
 ```
+
+> All commands must be run from inside the `claude-science-codex-connector`
+> directory. If you see `no such file or directory: ./start.sh`, you are not in
+> the repo folder — run `cd claude-science-codex-connector` first. If `./start.sh`
+> reports permission denied, run `chmod +x start.sh setup-codex-device.py` or use
+> the `bash start.sh` / `python3 setup-codex-device.py` forms shown above.
 
 `setup-codex-device.py` will:
 
@@ -85,10 +95,31 @@ Default settings live in `config.example.json`. The first run of `start.sh` copi
 | --- | --- | --- |
 | `openai_auth_mode` | `codex_device` uses your ChatGPT subscription quota | `api_key` |
 | `codex_backend_url` | ChatGPT Codex backend URL | `https://chatgpt.com/backend-api/codex` |
-| `codex_model` | Model to use | `gpt-5-codex` |
+| `codex_model` | Default model when no per-model mapping matches | `gpt-5-codex` |
+| `codex_model_map` | Maps each Claude model to a Codex model (see below) | `{}` |
 | `proxy_port` | Local proxy port | `9876` |
 
 > If OpenAI changes the Codex backend URL or model name, override `codex_backend_url` / `codex_model` in `config.json`.
+
+### Per-model mapping
+
+Claude Science requests different Claude models (Opus / Sonnet / Haiku). You can map each to a specific Codex model with `codex_model_map`. Keep `force_model` empty, otherwise it overrides the map for every request.
+
+```json
+{
+  "openai_auth_mode": "codex_device",
+  "default_backend": "openai",
+  "force_model": "",
+  "codex_model": "gpt-5.5-codex",
+  "codex_model_map": {
+    "claude-opus-4-8": "gpt-5.5-codex",
+    "claude-sonnet-4-5": "gpt-5.5-codex",
+    "claude-haiku-4-5": "gpt-5.4-codex"
+  }
+}
+```
+
+Any model not in the map falls back to `codex_model`.
 
 ## Project structure
 

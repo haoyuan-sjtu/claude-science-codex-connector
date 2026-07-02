@@ -69,6 +69,7 @@ class Config:
         "codex_client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
         "codex_backend_url": "https://chatgpt.com/backend-api/codex",
         "codex_model": "gpt-5-codex",
+        "codex_model_map": {},
         "default_backend": "deepseek",
         "force_model": "",
         "deepseek_model_map": {},
@@ -96,6 +97,7 @@ class Config:
         "codex_client_id": "CODEX_CLIENT_ID",
         "codex_backend_url": "CODEX_BACKEND_URL",
         "codex_model": "CODEX_MODEL",
+        "codex_model_map": "CODEX_MODEL_MAP",
         "default_backend": "DEFAULT_BACKEND",
         "force_model": "FORCE_MODEL",
         "deepseek_model_map": "DEEPSEEK_MODEL_MAP",
@@ -109,7 +111,7 @@ class Config:
         "proxy_host": "PROXY_HOST",
         "proxy_port": "PROXY_PORT",
     }
-    JSON_KEYS = {"deepseek_model_map", "openai_model_map", "custom_model_map"}
+    JSON_KEYS = {"deepseek_model_map", "openai_model_map", "custom_model_map", "codex_model_map"}
 
     def __init__(self):
         self._data = dict(self.DEFAULTS)
@@ -189,6 +191,8 @@ class Config:
     @property
     def codex_model(self) -> str: return self._data["codex_model"]
     @property
+    def codex_model_map(self) -> dict: return self._data["codex_model_map"]
+    @property
     def default_backend(self) -> str: return self._data["default_backend"]
     @property
     def force_model(self) -> str: return self._data["force_model"]
@@ -239,7 +243,12 @@ class Config:
         elif backend == "openai":
             if self.openai_auth_mode == "codex_device":
                 base_url = self.codex_backend_url.rstrip("/")
-                mapped_model = self.force_model or self.codex_model or "gpt-5-codex"
+                mapped_model = (
+                    self.force_model
+                    or self.codex_model_map.get(model)
+                    or self.codex_model
+                    or "gpt-5-codex"
+                )
                 auth_header = codex_auth_store.authorization_header()
                 return {
                     "backend": "codex",
@@ -1754,7 +1763,7 @@ async def api_update_config(request: Request):
         "codex_auth_base_url", "codex_device_url", "codex_client_id",
         "codex_backend_url", "codex_model",
         "default_backend", "force_model",
-        "deepseek_model_map", "openai_model_map", "custom_model_map",
+        "deepseek_model_map", "openai_model_map", "custom_model_map", "codex_model_map",
         "deepseek_model_pattern", "openai_model_pattern", "custom_model_pattern",
         "reasoning_content_policy", "inline_image_policy",
     }

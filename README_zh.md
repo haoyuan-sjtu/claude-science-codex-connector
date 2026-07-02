@@ -84,10 +84,31 @@ curl -sS http://127.0.0.1:9876/v1/messages \
 | --- | --- | --- |
 | `openai_auth_mode` | `codex_device` 时使用 ChatGPT 订阅额度 | `api_key` |
 | `codex_backend_url` | ChatGPT Codex 后端地址 | `https://chatgpt.com/backend-api/codex` |
-| `codex_model` | 使用的模型 | `gpt-5-codex` |
+| `codex_model` | 无匹配映射时的默认模型 | `gpt-5-codex` |
+| `codex_model_map` | 把每个 Claude 模型映射到对应 Codex 模型（见下） | `{}` |
 | `proxy_port` | 本地代理端口 | `9876` |
 
 > 如果 OpenAI 调整了 Codex 后端地址或模型名，可在 `config.json` 中覆盖 `codex_backend_url` / `codex_model`。
+
+### 按模型映射
+
+Claude Science 会请求不同的 Claude 模型（Opus / Sonnet / Haiku）。你可以用 `codex_model_map` 把每个模型映射到指定的 Codex 模型。注意：`force_model` 必须留空，否则它会对所有请求覆盖映射。
+
+```json
+{
+  "openai_auth_mode": "codex_device",
+  "default_backend": "openai",
+  "force_model": "",
+  "codex_model": "gpt-5.5-codex",
+  "codex_model_map": {
+    "claude-opus-4-8": "gpt-5.5-codex",
+    "claude-sonnet-4-5": "gpt-5.5-codex",
+    "claude-haiku-4-5": "gpt-5.4-codex"
+  }
+}
+```
+
+映射中未列出的模型会回退到 `codex_model`。
 
 ## 项目结构
 
