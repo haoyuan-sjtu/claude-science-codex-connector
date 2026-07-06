@@ -3,12 +3,14 @@ config.json
 codex-auth.json
 *.plist
 *.log
+certs/
 
 # Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
+science/
 
 # macOS
 .DS_Store

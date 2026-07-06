@@ -45,6 +45,7 @@ APP_DIR = Path(__file__).resolve().parent
 PROXY_DIR = Path(os.environ.get("CLAUDE_SCIENCE_PROXY_DIR", str(APP_DIR))).expanduser()
 CONFIG_FILE = PROXY_DIR / "config.json"
 CODEX_AUTH_FILE = PROXY_DIR / "codex-auth.json"
+CODEX_CLI_AUTH_FILE = Path.home() / ".codex" / "auth.json"
 STATIC_DIR = PROXY_DIR / "static"
 TOKEN_DIR = Path.home() / ".claude-science" / ".oauth-tokens"
 ENC_KEY_FILE = Path.home() / ".claude-science" / "encryption.key"
@@ -355,7 +356,10 @@ class CodexAuthStore:
     def _is_expiring(self, data: dict) -> bool:
         expires_at = data.get("expires_at")
         if not expires_at:
-            return False
+            exp = _exp_from_access_token(data.get("access_token", ""))
+            if exp is None:
+                return False
+            return exp <= time.time() + 300
         try:
             if isinstance(expires_at, (int, float)):
                 expires_ts = float(expires_at)
@@ -368,7 +372,7 @@ class CodexAuthStore:
     def refresh(self, data: dict) -> dict:
         refresh_token = data.get("refresh_token")
         if not refresh_token:
-            return data
+            return self._maybe_import_from_cli(data)
         payload = {
             "grant_type": "refresh_token",
             "refresh_token": refresh_token,
@@ -384,14 +388,54 @@ class CodexAuthStore:
                 trust_env=False,
             )
             if resp.status_code != 200:
-                return data
+                return self._maybe_import_from_cli(data)
             token_data = resp.json()
             merged = dict(data)
             merged.update(_normalize_codex_token_response(token_data, payload["client_id"]))
             self.save(merged)
             return merged
         except Exception:
+            return self._maybe_import_from_cli(data)
+
+    def _maybe_import_from_cli(self, data: dict) -> dict:
+        """Fallback: re-import a fresh token from the Codex CLI auth file.
+
+        The Codex CLI and this bridge share one OAuth credential. OpenAI refresh
+        tokens are one-time-use, so if the CLI refreshes first it consumes the
+        refresh_token and the bridge's own refresh returns 401
+        refresh_token_reused. Re-importing from the CLI keeps the bridge working
+        without forcing the user to re-run setup-codex-device.py manually.
+        """
+        if not CODEX_CLI_AUTH_FILE.exists():
             return data
+        try:
+            with open(CODEX_CLI_AUTH_FILE) as f:
+                cli_data = json.load(f)
+        except Exception:
+            return data
+        tokens = cli_data.get("tokens") if isinstance(cli_data, dict) else None
+        if not isinstance(tokens, dict) or not tokens.get("access_token"):
+            return data
+        new_exp = _exp_from_access_token(tokens.get("access_token", ""))
+        old_exp = _exp_from_access_token(data.get("access_token", ""))
+        if new_exp and old_exp and new_exp <= old_exp:
+            return data
+        imported = _normalize_codex_token_response(
+            {
+                "access_token": tokens.get("access_token"),
+                "refresh_token": tokens.get("refresh_token"),
+                "id_token": tokens.get("id_token"),
+                "chatgpt_account_id": tokens.get("account_id"),
+            },
+            data.get("client_id") or config.codex_client_id,
+        )
+        if not imported.get("access_token"):
+            return data
+        merged = dict(data)
+        merged.update(imported)
+        self.save(merged)
+        print("[proxy] re-imported fresh Codex token from ~/.codex/auth.json (refresh_token was reused)", flush=True)
+        return merged
 
 
 def _expires_at_from_response(token_data: dict) -> str:
@@ -401,6 +445,10 @@ def _expires_at_from_response(token_data: dict) -> str:
     expires_in = token_data.get("expires_in")
     if isinstance(expires_in, (int, float)):
         dt = datetime.fromtimestamp(time.time() + float(expires_in), tz=timezone.utc)
+        return dt.isoformat().replace("+00:00", "Z")
+    exp = _exp_from_access_token(token_data.get("access_token", ""))
+    if exp:
+        dt = datetime.fromtimestamp(exp, tz=timezone.utc)
         return dt.isoformat().replace("+00:00", "Z")
     return ""
 
@@ -435,6 +483,17 @@ def _decode_jwt_claims(token: str) -> dict:
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
+
+
+def _exp_from_access_token(access_token: str) -> Optional[float]:
+    """Extract the `exp` claim from a JWT access token, or None."""
+    if not access_token:
+        return None
+    claims = _decode_jwt_claims(access_token)
+    exp = claims.get("exp")
+    if isinstance(exp, (int, float)):
+        return float(exp)
+    return None
 
 
 def _account_id_from_id_token(id_token: str) -> str:
@@ -732,6 +791,91 @@ def sanitize_tool_schema(schema, *, force_object: bool = False) -> dict:
         if not isinstance(cleaned.get("properties"), dict):
             cleaned["properties"] = {}
     return cleaned
+
+
+# ---------------------------------------------------------------------------
+# Mutual-exclusivity enforcement for tool schemas
+#
+# The Codex model tends to pass every optional parameter it sees, including
+# groups that are mutually exclusive (e.g. a read tool's offset/limit for text
+# vs pages for PDF), which the downstream tool validator rejects with
+# "pages and offset/limit are mutually exclusive". Pure instruction text does
+# not reliably stop this. Restructuring the schema with `oneOf` DOES: the Codex
+# backend accepts oneOf and the model picks exactly one variant.
+#
+# Each rule lists groups of param-name patterns. When a schema's properties
+# match two or more groups in a rule, the matched (exclusive) props are split
+# into oneOf variants; the remaining (common) props stay at the root and are
+# shared by every variant. Extend MUTUAL_EXCLUSIVITY_RULES for other tools.
+# ---------------------------------------------------------------------------
+MUTUAL_EXCLUSIVITY_RULES = [
+    {
+        "groups": [
+            {"patterns": [r"^(offset|limit|start_line|end_line|line_start|line_end|from_line|to_line|start|end)$"],
+             "label": "text/line mode"},
+            {"patterns": [r"^(pages|page|page_range|page_numbers|page_num|page_count)$"],
+             "label": "pdf/page mode"},
+        ],
+    },
+]
+
+
+def _match_exclusivity_group(prop_name: str, group: dict) -> bool:
+    for pat in group["patterns"]:
+        if re.match(pat, prop_name, re.IGNORECASE):
+            return True
+    return False
+
+
+def apply_mutual_exclusivity(schema: dict) -> dict:
+    """Restructure a tool schema to express mutually-exclusive param groups via oneOf.
+
+    If the schema's properties match two or more exclusive groups (per
+    MUTUAL_EXCLUSIVITY_RULES), the exclusive props are moved into oneOf variants
+    and the common props remain at the root. Idempotent: schemas that already
+    carry oneOf/anyOf, or that match fewer than two groups, are returned as-is.
+    """
+    if not isinstance(schema, dict):
+        return schema
+    if "oneOf" in schema or "anyOf" in schema:
+        return schema
+    props = schema.get("properties")
+    if not isinstance(props, dict) or not props:
+        return schema
+
+    for rule in MUTUAL_EXCLUSIVITY_RULES:
+        groups = rule["groups"]
+        matched = []  # list of (group, [prop_names])
+        for g in groups:
+            hits = [name for name in props if _match_exclusivity_group(name, g)]
+            if hits:
+                matched.append((g, hits))
+        if len(matched) < 2:
+            continue
+
+        exclusive_names: set = set()
+        variants = []
+        for g, hits in matched:
+            exclusive_names.update(hits)
+            variants.append({
+                "type": "object",
+                "description": f"{g['label']}. Mutually exclusive with the other mode(s); choose exactly one and omit the others.",
+                "properties": {name: props[name] for name in hits},
+            })
+
+        common_props = {name: p for name, p in props.items() if name not in exclusive_names}
+        new_schema = dict(schema)
+        new_schema["properties"] = common_props
+        req = schema.get("required")
+        if isinstance(req, list):
+            new_schema["required"] = [r for r in req if r not in exclusive_names]
+        desc = schema.get("description", "")
+        note = "Parameters are split into mutually-exclusive modes via oneOf; select exactly one mode."
+        new_schema["description"] = f"{desc} {note}".strip() if desc else note
+        new_schema["oneOf"] = variants
+        return new_schema
+
+    return schema
 
 
 def _is_inline_image_url(url: str) -> bool:
@@ -1096,6 +1240,24 @@ def _anthropic_system_to_instructions(system) -> str:
     return str(system)
 
 
+# Injected into Codex `instructions` whenever tools are present. The Codex model
+# otherwise tends to pass mutually-exclusive parameters together (e.g. a read
+# tool's offset/limit for text AND pages for PDF), which the downstream tool
+# validator rejects. This guidance is streaming-safe (it shapes generation, so
+# no post-processing of the SSE stream is needed).
+TOOL_USAGE_GUIDANCE = (
+    "[Tool call parameter rules — mandatory]\n"
+    "When calling a tool, include ONLY the parameters that apply to the specific input. "
+    "Never combine parameters that serve mutually-exclusive purposes in a single call.\n"
+    "Specifically, for file/read tools:\n"
+    "- `offset` and `limit` apply to TEXT files (line-based reading).\n"
+    "- `pages` applies to PDF files (page-based reading).\n"
+    "- These two groups are MUTUALLY EXCLUSIVE: choose ONE group based on the file extension "
+    "(`.pdf` => use `pages`; other text extensions => use `offset`/`limit`) and OMIT the other group entirely. "
+    "Never emit both groups, and never emit empty `{}` for a required parameter."
+)
+
+
 # __CODEX_TRANSLATION_ANCHOR__
 
 
@@ -1192,6 +1354,8 @@ def anthropic_to_codex_responses(anthropic_body: dict, backend_model: str) -> di
     }
 
     instructions = _anthropic_system_to_instructions(anthropic_body.get("system"))
+    if anthropic_body.get("tools"):
+        instructions = (instructions + "\n\n" + TOOL_USAGE_GUIDANCE) if instructions else TOOL_USAGE_GUIDANCE
     if instructions:
         responses_body["instructions"] = instructions
 
@@ -1213,7 +1377,7 @@ def anthropic_to_codex_responses(anthropic_body: dict, backend_model: str) -> di
                 "type": "function",
                 "name": safe_name,
                 "description": tool.get("description", ""),
-                "parameters": sanitize_tool_schema(tool.get("input_schema", {}), force_object=True),
+                "parameters": apply_mutual_exclusivity(sanitize_tool_schema(tool.get("input_schema", {}), force_object=True)),
             })
         if responses_tools:
             responses_body["tools"] = responses_tools
@@ -1298,8 +1462,9 @@ async def translate_codex_stream(codex_stream, original_model: str, request_id: 
 
     message_started = False
     text_block_open = False
+    text_index: Optional[int] = None
     tool_blocks: dict[str, dict] = {}
-    next_index = 1
+    next_index = 0
     output_tokens = 0
     input_tokens = 0
     stop_reason = "end_turn"
@@ -1344,15 +1509,17 @@ async def translate_codex_stream(codex_stream, original_model: str, request_id: 
                 yield start
             if not text_block_open:
                 text_block_open = True
-                yield ev("content_block_start", {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}})
+                text_index = next_index
+                next_index += 1
+                yield ev("content_block_start", {"type": "content_block_start", "index": text_index, "content_block": {"type": "text", "text": ""}})
             delta = event.get("delta", "")
             if delta:
-                yield ev("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": delta}})
+                yield ev("content_block_delta", {"type": "content_block_delta", "index": text_index, "delta": {"type": "text_delta", "text": delta}})
 
         elif etype == "response.output_text.done":
             if text_block_open:
                 text_block_open = False
-                yield ev("content_block_stop", {"type": "content_block_stop", "index": 0})
+                yield ev("content_block_stop", {"type": "content_block_stop", "index": text_index})
 
         elif etype == "response.output_item.added":
             item = event.get("item", {}) or {}
@@ -1362,7 +1529,7 @@ async def translate_codex_stream(codex_stream, original_model: str, request_id: 
                     yield start
                 if text_block_open:
                     text_block_open = False
-                    yield ev("content_block_stop", {"type": "content_block_stop", "index": 0})
+                    yield ev("content_block_stop", {"type": "content_block_stop", "index": text_index})
                 saw_tool_use = True
                 idx = next_index
                 next_index += 1
@@ -1416,7 +1583,7 @@ async def translate_codex_stream(codex_stream, original_model: str, request_id: 
             },
         })
     if text_block_open:
-        yield ev("content_block_stop", {"type": "content_block_stop", "index": 0})
+        yield ev("content_block_stop", {"type": "content_block_stop", "index": text_index})
     yield ev("message_delta", {"type": "message_delta", "delta": {"stop_reason": stop_reason, "stop_sequence": None}, "usage": {"output_tokens": output_tokens}})
     yield ev("message_stop", {"type": "message_stop"})
 
@@ -2131,6 +2298,19 @@ if __name__ == "__main__":
         print(f"  HTTPS     → https://{config.proxy_host}:{HTTPS_PORT}")
         print(f"  Cert CN   → api.anthropic.com")
     print(f"  Health    → http://{config.proxy_host}:{config.proxy_port}/health")
+    print(f"  {'-'*56}")
+    print(f"  Codex link:")
+    print(f"    backend → {config.codex_backend_url}")
+    print(f"    model   → {config.codex_model}")
+    if config.openai_auth_mode == "codex_device":
+        if codex_auth_store.is_configured():
+            _email = codex_auth_store.public_email() or "(unknown)"
+            _exp = codex_auth_store.public_expires_at() or "(unknown)"
+            print(f"    auth    → codex_device ({_email}, expires {_exp})")
+        else:
+            print(f"    auth    → codex_device (NOT configured — run ./setup-codex-device.py)")
+    else:
+        print(f"    auth    → {config.openai_auth_mode} (set openai_auth_mode=codex_device to use ChatGPT quota)")
     print(f"{'='*60}\n")
 
     if have_ssl:

@@ -159,6 +159,10 @@ def expires_at_from_response(token_data: dict) -> str:
     if isinstance(expires_in, (int, float)):
         dt = datetime.fromtimestamp(time.time() + float(expires_in), tz=timezone.utc)
         return dt.isoformat().replace("+00:00", "Z")
+    exp = _exp_from_access_token(token_data.get("access_token", ""))
+    if exp:
+        dt = datetime.fromtimestamp(exp, tz=timezone.utc)
+        return dt.isoformat().replace("+00:00", "Z")
     return ""
 
 
@@ -191,6 +195,16 @@ def _decode_jwt_claims(token: str) -> dict:
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
+
+
+def _exp_from_access_token(access_token: str):
+    if not access_token:
+        return None
+    claims = _decode_jwt_claims(access_token)
+    exp = claims.get("exp")
+    if isinstance(exp, (int, float)):
+        return float(exp)
+    return None
 
 
 def _account_id_from_id_token(id_token: str) -> str:
