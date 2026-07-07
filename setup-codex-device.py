@@ -33,7 +33,7 @@ DEFAULTS = {
     "codex_device_url": "https://auth.openai.com/codex/device",
     "codex_client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
     "codex_backend_url": "https://chatgpt.com/backend-api/codex",
-    "codex_model": "gpt-5-codex",
+    "codex_model": "gpt-5.5",
     "default_backend": "deepseek",
 }
 

@@ -15,9 +15,9 @@ A ChatGPT Pro/Plus login token **cannot** call `api.openai.com` directly. This t
 ## Requirements
 
 - Tested on macOS (Windows/Linux not yet confirmed)
-- Claude Science installed
+- Claude Science installed **and opened at least once** (the first launch creates `~/.claude-science/encryption.key`, which the bridge needs to mint a local OAuth token — see [Quick start](#quick-start))
 - A ChatGPT Pro or Plus subscription
-- Python 3.9+
+- Python 3.9+ (only the standard library is needed for setup; the proxy's third-party deps are auto-installed into a local `.venv` by the start scripts)
 
 ## Quick start
 
@@ -26,25 +26,29 @@ A ChatGPT Pro/Plus login token **cannot** call `api.openai.com` directly. This t
 git clone https://github.com/haoyuan-sjtu/claude-science-codex-connector.git
 cd claude-science-codex-connector
 
-# 1. Install dependencies
+# 1. (Optional) Pre-install dependencies. The start scripts auto-create a
+#    local .venv and install these on first run, so this is just a one-time
+#    sanity check that your Python can build them.
 pip install -r requirements.txt
 
 # 2. Sign in with a Codex device code
 #    (opens https://auth.openai.com/codex/device where you enter the code)
 python3 setup-codex-device.py
 
-# 3. Point Claude Science at the local proxy
-export ANTHROPIC_BASE_URL=http://127.0.0.1:9876
-
-# 4. Start the proxy
+# 3. Start the proxy (auto-creates .venv if missing, mints the local OAuth
+#    token via ~/.claude-science/encryption.key, then runs in the foreground)
 bash ./start.sh
 ```
+
+> **First-time prerequisite:** make sure the Claude Science app has been opened **at least once** before step 3. That first launch creates `~/.claude-science/encryption.key`. If it's missing, `start.sh` prints a warning and skips the token step, and Claude Science won't route through the bridge.
 
 > All commands must be run from inside the `claude-science-codex-connector`
 > directory. If you see `no such file or directory: ./start.sh`, you are not in
 > the repo folder — run `cd claude-science-codex-connector` first. If `./start.sh`
 > reports permission denied, run `chmod +x start.sh setup-codex-device.py` or use
 > the `bash start.sh` / `python3 setup-codex-device.py` forms shown above.
+
+> Once the proxy is running, you still need to launch Claude Science **through the bridge** (it won't route through the proxy if opened from the Dock). Jump to [Daily startup](#daily-startup-after-each-reboot).
 
 `setup-codex-device.py` will:
 
@@ -58,23 +62,78 @@ After a successful login, the token is stored locally in `codex-auth.json` (mode
   "openai_auth_mode": "codex_device",
   "default_backend": "openai",
   "codex_backend_url": "https://chatgpt.com/backend-api/codex",
-  "codex_model": "gpt-5-codex"
+  "codex_model": "gpt-5.5"
 }
 ```
 
 ## Point Claude Science at the proxy
 
-Once the proxy is running, make sure Claude Science uses the local proxy address:
+Once the proxy is running, Claude Science must be launched with the local proxy address in its environment:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://127.0.0.1:9876
 ```
 
-Then (re)start Claude Science. You can also open the management dashboard to check status:
+Launching Claude Science from the Dock / Finder / Spotlight does **not** inherit this variable, so it will call the real `api.anthropic.com` and fail with `401`. Use the one-click script or the manual launch in [Daily startup](#daily-startup-after-each-reboot) instead. You can also open the management dashboard to check status:
 
 ```
 http://127.0.0.1:9876/dashboard
 ```
+
+## Daily startup (after each reboot)
+
+The first-time setup above only needs to be done once. After each reboot, use one of the one-click scripts — or the manual steps below — to bring everything back up.
+
+> Paths below are written as `.../start-mac.sh`, `.../start.sh`, etc. `...` stands for **this project's directory on your machine** (your local actual path, e.g. `~/.claude-science/claude-science-api-bridge-main`) — substitute it accordingly.
+
+> ⚠️ **macOS caveat:** do **not** launch Claude Science from the Dock / Finder / Spotlight. A GUI launch does **not** inherit the `ANTHROPIC_BASE_URL` environment variable, so Claude Science will call the real `api.anthropic.com` with an expired session and you'll get `401` / `"Your Claude session is no longer valid"`. Always launch it from the shell (or via the one-click script) so the env var is inherited.
+
+### One-click (recommended)
+
+**macOS** — from anywhere:
+```bash
+bash .../start-mac.sh
+```
+- Starts the bridge proxy on `127.0.0.1:9876` (backgrounded; logs at `~/.claude-science/logs/bridge-proxy.log`)
+- Relaunches Claude Science with `ANTHROPIC_BASE_URL=http://127.0.0.1:9876`
+- Verifies the env var was injected into the Claude Science process
+- `bash start-mac.sh --stop` stops everything; `--proxy-only` starts just the proxy
+
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start-windows.ps1
+```
+- `-Stop` stops everything; `-ProxyOnly` starts just the proxy
+- If Claude Science isn't in a standard install folder, edit the `$candidates` list near the top of the script
+- Windows support is untested — see [Requirements](#requirements)
+
+### Manual steps (macOS)
+
+Run these in order after each reboot.
+
+**Step 1 — Start the bridge proxy** (foreground; keep this terminal open):
+```bash
+bash .../start.sh
+```
+You should see `Dashboard: http://127.0.0.1:9876/dashboard`. Do not close this terminal — closing it stops the proxy.
+
+**Step 2 — In a new terminal, launch Claude Science with the env var:**
+```bash
+export ANTHROPIC_BASE_URL=http://127.0.0.1:9876
+"/Applications/Claude Science.app/Contents/MacOS/ClaudeScience" &
+```
+
+**Step 3 — Verify:**
+```bash
+ps eww -p $(pgrep -f "ClaudeScience" | head -1) | tr ' ' '\n' | grep ANTHROPIC_BASE_URL
+```
+Output `ANTHROPIC_BASE_URL=http://127.0.0.1:9876` means you're good to go.
+
+### Reminders
+
+- Don't launch Claude Science from Dock / Finder / Spotlight — it won't inherit the env var and the `401` error will return.
+- If you close Claude Science and want to reopen it, just rerun Step 2 (skip Step 1 if the proxy is still alive).
+- If the proxy process died, rerun Step 1.
 
 ## Verify
 
@@ -140,6 +199,8 @@ Any model not in the map falls back to `codex_model`.
 ├── setup-codex-device.py  # Codex device-code login
 ├── setup-token.py         # Generates a local OAuth token Claude Science accepts
 ├── start.sh               # Starts the proxy
+├── start-mac.sh           # One-click startup: proxy + Claude Science (macOS)
+├── start-windows.ps1      # One-click startup: proxy + Claude Science (Windows)
 └── static/
     └── dashboard.html     # Management dashboard
 ```
