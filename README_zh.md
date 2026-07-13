@@ -35,7 +35,7 @@ python3 setup-codex-device.py
 
 # 3. 启动代理（首次会自动创建 .venv、用 ~/.claude-science/encryption.key 生成本地
 #    OAuth token，然后前台运行代理）
-bash ./start.sh
+bash ./start.sh (./start-mac.sh or ./start-windows.ps1)
 ```
 
 > **首次使用前置条件：** 第 3 步之前，请确保 Claude Science app 已**至少打开过一次**。首次打开会生成 `~/.claude-science/encryption.key`；若该文件不存在，`start.sh` 会打印警告并跳过 token 生成，Claude Science 将不会走桥接。
