@@ -37,7 +37,7 @@ python3 setup-codex-device.py
 
 # 3. Start the proxy (auto-creates .venv if missing, mints the local OAuth
 #    token via ~/.claude-science/encryption.key, then runs in the foreground)
-bash ./start-mac.sh(or ./start-windows.ps1)
+bash ./start.sh (./start-mac.sh or ./start-windows.ps1)
 ```
 
 > **First-time prerequisite:** make sure the Claude Science app has been opened **at least once** before step 3. That first launch creates `~/.claude-science/encryption.key`. If it's missing, `start.sh` prints a warning and skips the token step, and Claude Science won't route through the bridge.
