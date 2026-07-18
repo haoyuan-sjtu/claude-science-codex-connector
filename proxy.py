@@ -69,7 +69,7 @@ class Config:
         "codex_device_url": "https://auth.openai.com/codex/device",
         "codex_client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
         "codex_backend_url": "https://chatgpt.com/backend-api/codex",
-        "codex_model": "gpt-5.5",
+        "codex_model": "gpt-5.6-sol",
         "codex_model_map": {},
         "default_backend": "deepseek",
         "force_model": "",
@@ -248,7 +248,7 @@ class Config:
                     self.force_model
                     or self.codex_model_map.get(model)
                     or self.codex_model
-                    or "gpt-5.5"
+                    or "gpt-5.6-sol"
                 )
                 auth_header = codex_auth_store.authorization_header()
                 return {
@@ -666,7 +666,7 @@ def get_client() -> httpx.AsyncClient:
         _client = httpx.AsyncClient(
             timeout=httpx.Timeout(120.0, connect=10.0),
             limits=httpx.Limits(max_keepalive_connections=20),
-            trust_env=False,
+            trust_env=True,
         )
     return _client
 
@@ -2052,7 +2052,7 @@ async def api_test_backend(request: Request):
             "account_id": codex_auth_store.account_id(),
         }
         probe_body = {
-            "model": config.codex_model or "gpt-5.5",
+            "model": config.codex_model or "gpt-5.6-sol",
             "input": [{"type": "message", "role": "user", "content": [{"type": "input_text", "text": "ping"}]}],
             "stream": True,
             "store": False,
@@ -2063,7 +2063,7 @@ async def api_test_backend(request: Request):
                 async with c.stream("POST", url, json=probe_body, headers=_codex_headers(backend)) as resp:
                     if resp.status_code == 200:
                         await resp.aclose()
-                        return {"ok": True, "models": [config.codex_model or "gpt-5.5"]}
+                        return {"ok": True, "models": [config.codex_model or "gpt-5.6-sol"]}
                     err_text = (await resp.aread()).decode("utf-8", errors="replace")[:300]
                     return {"ok": False, "error": f"HTTP {resp.status_code}: {err_text}"}
         except Exception as e:

@@ -18,6 +18,7 @@ A ChatGPT Pro/Plus login token **cannot** call `api.openai.com` directly. This t
 - Claude Science installed **and opened at least once** (the first launch creates `~/.claude-science/encryption.key`, which the bridge needs to mint a local OAuth token — see [Quick start](#quick-start))
 - A ChatGPT Pro or Plus subscription
 - Python 3.9+ (only the standard library is needed for setup; the proxy's third-party deps are auto-installed into a local `.venv` by the start scripts)
+- Codex CLI version that can use both `gpt-5.6-sol` and `gpt-5.6-terra`. Run `codex --version`, update the CLI if necessary, and confirm both models are available before setup. GPT-5.4 is no longer supported by this connector.
 
 ## Quick start
 
@@ -62,7 +63,7 @@ After a successful login, the token is stored locally in `codex-auth.json` (mode
   "openai_auth_mode": "codex_device",
   "default_backend": "openai",
   "codex_backend_url": "https://chatgpt.com/backend-api/codex",
-  "codex_model": "gpt-5.5"
+  "codex_model": "gpt-5.6-sol"
 }
 ```
 
@@ -154,7 +155,7 @@ Default settings live in `config.example.json`. The first run of `start.sh` copi
 | --- | --- | --- |
 | `openai_auth_mode` | `codex_device` uses your ChatGPT subscription quota | `api_key` |
 | `codex_backend_url` | ChatGPT Codex backend URL | `https://chatgpt.com/backend-api/codex` |
-| `codex_model` | Default model when no per-model mapping matches | `gpt-5.5` |
+| `codex_model` | Default model when no per-model mapping matches | `gpt-5.6-sol` |
 | `codex_model_map` | Maps each Claude model to a Codex model (see below) | `{}` |
 | `proxy_port` | Local proxy port | `9876` |
 
@@ -169,20 +170,23 @@ Claude Science requests different Claude models (Opus / Sonnet / Haiku). You can
   "openai_auth_mode": "codex_device",
   "default_backend": "openai",
   "force_model": "",
-  "codex_model": "gpt-5.5",
+  "codex_model": "gpt-5.6-sol",
   "codex_model_map": {
-    "claude-opus-4-8": "gpt-5.5",
-    "claude-sonnet-4-5": "gpt-5.5",
-    "claude-haiku-4-5": "gpt-5.4"
+    "claude-opus-4-8": "gpt-5.6-sol",
+    "claude-sonnet-4-5": "gpt-5.6-sol",
+    "claude-haiku-4-5": "gpt-5.6-terra"
   }
 }
 ```
 
 Any model not in the map falls back to `codex_model`.
 
-> **Note on model IDs:** with a ChatGPT account, the Codex backend only accepts
-> its supported model IDs (e.g. `gpt-5.5`, `gpt-5.4`). Suffixed variants like
-> `gpt-5.5-codex` or `gpt-5`/`gpt-5-codex` are rejected with a 400 error.
+> **Important:** Before setup, check `codex --version` and update Codex CLI if
+> necessary. Your installed Codex CLI must be able to use both `gpt-5.6-sol` and
+> `gpt-5.6-terra`; GPT-5.4 is retired and is not supported by this connector.
+> With a ChatGPT account, the Codex backend accepts only the model IDs supported
+> by your current CLI and account. Suffixed variants such as
+> `gpt-5.6-sol-codex` are rejected with a 400 error.
 > The backend also rejects the `temperature`, `top_p`, and `max_output_tokens`
 > parameters, so the proxy omits them automatically for the Codex path.
 

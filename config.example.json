@@ -10,14 +10,14 @@
   "codex_device_url": "https://auth.openai.com/codex/device",
   "codex_client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
   "codex_backend_url": "https://chatgpt.com/backend-api/codex",
-  "codex_model": "gpt-5.5",
+  "codex_model": "gpt-5.6-sol",
   "codex_model_map": {
-    "claude-opus-4-8": "gpt-5.5",
-    "claude-sonnet-4-5": "gpt-5.5",
-    "claude-haiku-4-5": "gpt-5.4"
+    "claude-opus-4-8": "gpt-5.6-sol",
+    "claude-sonnet-4-5": "gpt-5.6-sol",
+    "claude-haiku-4-5": "gpt-5.6-terra"
   },
   "default_backend": "deepseek",
-  "force_model": "deepseek-chat",
+  "force_model": "",
   "deepseek_model_map": {
     "claude-sonnet-4-5": "deepseek-chat",
     "claude-opus-4-8": "deepseek-chat"

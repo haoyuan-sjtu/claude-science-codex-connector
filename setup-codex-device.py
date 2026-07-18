@@ -33,7 +33,7 @@ DEFAULTS = {
     "codex_device_url": "https://auth.openai.com/codex/device",
     "codex_client_id": "app_EMoamEEZ73f0CkXaXp7hrann",
     "codex_backend_url": "https://chatgpt.com/backend-api/codex",
-    "codex_model": "gpt-5.5",
+    "codex_model": "gpt-5.6-sol",
     "default_backend": "deepseek",
 }
 
@@ -98,7 +98,7 @@ def import_codex_cli_auth(config: dict) -> bool:
         str(config.get("codex_client_id") or DEFAULTS["codex_client_id"]),
     )
     save_codex_auth(imported)
-    config.update({"openai_auth_mode": "codex_device", "default_backend": "openai"})
+    config.update({"openai_auth_mode": "codex_device", "default_backend": "openai", "force_model": ""})
     save_config(config)
     print("Imported existing Codex CLI ChatGPT login.")
     print("OpenAI backend is now set to use codex_device auth.")
@@ -340,7 +340,7 @@ def main() -> int:
             return 1
 
         save_codex_auth(normalized)
-        config.update({"openai_auth_mode": "codex_device", "default_backend": "openai"})
+        config.update({"openai_auth_mode": "codex_device", "default_backend": "openai", "force_model": ""})
         save_config(config)
         email = normalized.get("email") or "(email unavailable)"
         print(f"Codex device auth linked for {email}.")

@@ -1,6 +1,13 @@
 # Local secrets and runtime state - NEVER commit
 config.json
 codex-auth.json
+*-auth.json
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
 *.plist
 *.log
 certs/
